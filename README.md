@@ -5,14 +5,14 @@ Simple system resource monitor
 
 ## Feature 
 
-<input type="checkbox" id="1"  disabled checked>
-<label for="1">Built-in Websocket Handler</label><br>
-<input type="checkbox" id="2"  checked disabled>
-<label for="vehicle2">Disk \ CPU \ Memory Monitoring</label><br>
-<input type="checkbox" id="2"   disabled>
-<label for="vehicle2">NetWork Monitoring</label><br>
-<input type="checkbox" id="4"  disabled>
-<label for="4">Threshold value setting and warning info</label><br>
+
+* [x]Built-in Websocket Handler
+
+* [x]Disk \ CPU \ Memory Monitoring
+
+* [ ]NetWork Monitoring
+
+* [ ]Threshold value setting and warning info
 
 ## Get Start
 
