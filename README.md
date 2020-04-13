@@ -6,13 +6,13 @@ Simple system resource monitor
 ## Feature 
 
 
-* [x]Built-in Websocket Handler
+* [x] Built-in Websocket Handler
 
-* [x]Disk \ CPU \ Memory Monitoring
+* [x] Disk \ CPU \ Memory Monitoring
 
-* [ ]NetWork Monitoring
+* [ ] NetWork Monitoring
 
-* [ ]Threshold value setting and warning info
+* [ ] Threshold value setting and warning info
 
 ## Get Start
 
