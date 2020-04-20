@@ -10,7 +10,7 @@ Simple system resource monitor
 
 * [x] Disk \ CPU \ Memory Monitoring
 
-* [ ] NetWork Monitoring
+* [x] NetWork Monitoring
 
 * [ ] Threshold value setting and warning info
 
@@ -33,14 +33,16 @@ func main(){
 
 ### Data Sample
 ```
-{Name:Memory Data:map[Buffer:237768 Cache:578076 Free:1020176 Total:4039436 Used:2039544]}
-{Name:CPU Data: 1.020}
+{Name:Memory Data:map[Buffer:301268 Cache:1059852 Free:223552 Total:4039436 Used:2009616]}
+{Name:CPU Data: 6.122}
+{Name:NetWork Data:map[docker0:map[Download:0 Upload:0] eth0:map[Download:0 Upload:0] lo:map[Download:0 Upload:0] veth4e46e22:map[Download:0 Upload:0] veth9f0bfc5:map[Download:120 Upload:2] vethbdc60a0:map[Download:0 Upload:0] vethfdb15d5:map[Download:284 Upload:2] zt2lrrddgb:map[Download:0 Upload:0]]}
 {Name:Disk Data:map[vda:map[Read:0 Write:0]]}
 ```
 Default unit: 
 
 - <b> Kib </b> for Disk and Memory
 - <b>%</b>  for cpu usage
+- <b>bytes per second</b> for Network
 
 ## ScreenShot
 
