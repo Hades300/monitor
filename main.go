@@ -11,12 +11,16 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
 
+// Sampling Gap
 var GapMileSecond uint64 = 500
+
+// Time Out Ticker
 var Wait = time.Second * 20
 
 /*
@@ -42,6 +46,8 @@ type Resource struct {
 	Name string
 	Data interface{}
 }
+
+type Inspector func() Resource
 
 // return sth like "2.335" unit: %
 func CpuInfo() Resource {
@@ -80,6 +86,36 @@ func cpuSample(prevIdle uint64, prevTotal uint64) (currentIdle uint64, currentTo
 	return idleTime, totalTime, fmt.Sprintf("%6.3f", cpuUsage)
 }
 
+/**
+	cat /proc/net/dev then you will see the each field name
+	$1 -> Interface
+	$2 -> Receive Bytes
+	$10 -> Transmit Bytes
+**/
+
+// Return sth like {Name:NetWork Data:map[docker0:map[Download:0 Upload:0] eth0:map[Download:0 Upload:0]...[}  uint: Bytes per second
+func NetworkInfo() Resource {
+	results := MustExec("cat /proc/net/dev | grep \":\" | awk '{gsub(\":\", \" \");print $1 \":\" $2 \":\"  $3 \":\" $10 \":\" $11}'")
+	oldRaw := splitByEach(results, ":\n")
+	oldNumbers, names := ToNumber(oldRaw)
+	time.Sleep(time.Millisecond * time.Duration(GapMileSecond))
+	results = MustExec("cat /proc/net/dev | grep \":\" | awk '{gsub(\":\", \" \");print $1 \":\" $2 \":\"  $3 \":\" $10 \":\" $11}'")
+	newRaw := splitByEach(results, "\n:")
+	newNumbers, _ := ToNumber(newRaw)
+	netCardNum := len(names)
+	records := map[string]interface{}{}
+	for i := 0; i < netCardNum; i++ {
+		records[names[i]] = map[string]interface{}{
+			"Download": float64(newNumbers[0+i*2]-oldNumbers[0+i*2]) / (float64(GapMileSecond) / 1000),
+			"Upload":   float64(newNumbers[1+i*2]-oldNumbers[1+i*2]) / (float64(GapMileSecond) / 1000),
+		}
+	}
+	return Resource{
+		Name: "NetWork",
+		Data: records,
+	}
+}
+
 //  The /proc/diskstats file displays the I/O statistics
 //	of block devices. Each line contains the following 14
 //	fields:
@@ -98,7 +134,7 @@ func cpuSample(prevIdle uint64, prevTotal uint64) (currentIdle uint64, currentTo
 //	13 - time spent doing I/Os (ms)
 //	14 - weighted time spent doing I/Os (ms)
 
-// return a sth like this {"Total":1151532115,"Used":11188335...} unit: Kib
+// return sth like this {"Total":1151532115,"Used":11188335...} unit: Kib
 func MemInfo() Resource {
 	res := MustExec("free | grep \"Mem\" | awk '{print $2}'")
 	memUsageTotal, _ := strconv.ParseUint(strings.Trim(res, "\n"), 10, 64)
@@ -143,10 +179,10 @@ func DiskInfo() Resource {
 	// var info = make(map[string]map[string]interface{}, 10)
 	info := map[string]map[string]interface{}{}
 	res := MustExec("cat /proc/diskstats | awk '{print $3 \"\\n\" $6 \"\\n\" $7 \"\\n\" $10 \"\\n\" $11}'")
-	before, names := toNumber(strings.Fields(res))
+	before, names := ToNumber(strings.Fields(res))
 	time.Sleep(time.Millisecond * time.Duration(GapMileSecond))
 	res = MustExec("cat /proc/diskstats | awk '{print $3 \"\\n\" $6 \"\\n\" $7 \"\\n\" $10 \"\\n\" $11}'")
-	current, _ := toNumber(strings.Fields(res))
+	current, _ := ToNumber(strings.Fields(res))
 	diskNum := len(current) / 4
 	for i := 1; i <= diskNum; i++ {
 		offset := i - 1
@@ -179,21 +215,41 @@ func MustExec(command string) string {
 
 // revice a string slice with ["vda" "1" "23" "65"]
 // return a uint64 slice [1 23 65] and a string slice ["vda"]
-func toNumber(origin []string) ([]uint64, []string) {
+func ToNumber(origin []string) ([]uint64, []string) {
 	var res []uint64
 	var names []string
-	for i, val := range origin {
-		if i%5 == 0 {
-			names = append(names, val)
-			continue
-		}
+	for _, val := range origin {
+		val = strings.Trim(val, "\n")
 		number, err := strconv.ParseUint(val, 10, 64)
 		if err != nil {
-			panic(err)
+
+			names = append(names, val)
+			continue
+		} else {
+			res = append(res, number)
 		}
-		res = append(res, number)
 	}
 	return res, names
+}
+
+// Any char showed in sep will be regarded as a delimiter
+func splitByEach(source, sep string) []string {
+	length := len(source)
+	res := []string{}
+	start := 0
+	for i := 0; i < length; i++ {
+		// ptr run into delimiter
+		if strings.Contains(sep, string(source[i])) {
+			res = append(res, source[start:i])
+			start = i + 1
+		} else if i == length-1 {
+			// when ptr meet the end of string
+			res = append(res, source[start:i])
+		} else {
+			continue
+		}
+	}
+	return res
 }
 
 func endWithNumber(name string) bool {
@@ -251,14 +307,16 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 // Return Resource Slice
 func Once() []Resource {
 	var tests []Resource
-	done := make(chan struct{})
-	go func() {
-		res := CpuInfo()
-		tests = append(tests, res)
-		done <- struct{}{}
-	}()
-	tests = append(tests, DiskInfo())
-	tests = append(tests, MemInfo())
-	<-done
+	wg := sync.WaitGroup{}
+	inspectors := []Inspector{CpuInfo, DiskInfo, NetworkInfo, MemInfo}
+	for _, item := range inspectors {
+		a := item
+		wg.Add(1)
+		go func() {
+			tests = append(tests, a())
+			wg.Done()
+		}()
+	}
+	wg.Wait()
 	return tests
 }
