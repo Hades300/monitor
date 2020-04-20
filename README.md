@@ -46,6 +46,6 @@ Default unit:
 
 ## ScreenShot
 
-![My VPS Resource Info](http://q8ptr9gz2.bkt.clouddn.com/monitor.gif)
+![My VPS Resource Info](http://github.hades300.top/monitor.gif)
 
 Simple and Rough Self-used Frontend build with vue Contact at by1018987488@gmail.com if you really need that ...
